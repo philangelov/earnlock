@@ -32,6 +32,14 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+
+# frontend local runtime
+/frontend/node_modules/
+/frontend/.expo/
+
+# backend local runtime
+/backend/.venv/
 
 # typescript
 *.tsbuildinfo
