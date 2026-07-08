@@ -1,42 +1,61 @@
 /**
- * EarnLock color tokens — transcribed 1:1 from the design prototype's `themeVars()`
- * (EarnLock.dc.html). Four accent families: purple (primary/actions), pink (streak /
- * journey / accents), green (earned / correct), blue (coins / info). `*Soft` variants are
- * the same hues at ~15% alpha for icon/chip backgrounds.
+ * EarnLock color tokens — a clean, near-monochrome iOS-native palette anchored by a single
+ * electric-lime accent. Everything structural is greyscale (system-faithful grouped
+ * backgrounds, elevated surfaces, hairline separators); lime is reserved for the moments
+ * that matter — earned time, the primary action, live progress, the "unlocked" state.
+ *
+ * Rules of the system:
+ *  - `accent` is a FILL and a stroke, never body text. Text/icons on top of it use `onAccent`.
+ *  - When we truly need accent-colored text on a page, use `accentText` (a readable,
+ *    contrast-safe lime that darkens on light backgrounds and brightens on dark).
+ *  - `danger` (system red) is the only other hue, reserved for SOS / destructive / "incorrect".
+ *  - The "locked" state is intentionally monochrome, not red — restraint reads as calm.
  *
  * Every color in the app must come from here — no ad-hoc hex values in components.
  */
 
 export const LightTokens = {
-  bg: '#eef0f6',
-  bg2: '#ffffff',
+  /** Grouped page background (iOS systemGroupedBackground, nudged cooler). */
+  bg: '#f4f5f7',
+  /** Elevated card / sheet surface. */
   surface: '#ffffff',
-  surface2: '#e9eaf1',
-  text: '#191a24',
-  text2: '#666a7a',
-  text3: '#a3a6b6',
-  border: '#e3e4ee',
-  primary: '#7c3aed',
-  primaryPress: '#6a2fd8',
-  primarySoft: '#f0e9ff',
-  onPrimary: '#ffffff',
-  success: '#00a851',
-  successSoft: '#e0f7ea',
-  danger: '#f5384e',
-  dangerSoft: '#ffe8ea',
-  pink: '#e6248a',
-  pinkSoft: '#ffe4f1',
-  blue: '#0a84ff',
-  blueSoft: '#e2efff',
-  cyan: '#0a84ff',
-  cyanSoft: '#e2efff',
-  teal: '#00a851',
-  tealSoft: '#e0f7ea',
-  orange: '#e6248a',
-  orangeSoft: '#ffe4f1',
-  gold: '#0a84ff',
-  fire: '#e6248a',
-  statusInk: '#191a24',
+  /** A second elevated tone for nested surfaces on white. */
+  surface2: '#f6f7f9',
+  /** Sunken fill — progress tracks, unselected chips, icon wells. */
+  fill: '#eceef2',
+  /** Stronger sunken fill for pressed / secondary buttons. */
+  fillStrong: '#e2e5ea',
+
+  /** Primary label. */
+  text: '#0b0b0f',
+  /** Secondary label. */
+  text2: '#6a6c76',
+  /** Tertiary label — small captions, meta. Passes AA on bg + surface at 11–13px. */
+  text3: '#8b8d97',
+
+  /** Hairline separator (opaque equivalent of ~8% black). */
+  separator: '#e4e5ea',
+  /** Slightly stronger border for outlined controls. */
+  border: '#d9dbe1',
+
+  /** Electric lime — the one accent. Fills, rings, selected states, "earned". */
+  accent: '#c2f235',
+  /** Pressed accent. */
+  accentPress: '#b2e21f',
+  /** Text / icons that sit on top of an `accent` fill. */
+  onAccent: '#14180a',
+  /** Soft lime wash for chips / tinted buttons / highlight fills. */
+  accentSoft: '#eef8cf',
+  /** Contrast-safe lime for accent-colored TEXT on light surfaces (dark chartreuse). */
+  accentText: '#4b6b00',
+
+  /** System red — SOS, destructive, "incorrect". */
+  danger: '#ff3b30',
+  dangerSoft: '#ffe8e6',
+  onDanger: '#ffffff',
+
+  /** Dimmed overlay behind modals and locked-app tiles (same in both themes). */
+  scrim: 'rgba(10,10,16,0.5)',
 } as const;
 
 export type TokenName = keyof typeof LightTokens;
@@ -44,50 +63,51 @@ export type Tokens = Record<TokenName, string>;
 
 export const DarkTokens: Tokens = {
   bg: '#000000',
-  bg2: '#000000',
-  surface: '#121216',
-  surface2: '#1e1e24',
+  surface: '#141416',
+  surface2: '#1c1c20',
+  fill: '#26262b',
+  fillStrong: '#303036',
+
   text: '#ffffff',
-  text2: '#9a9aa4',
-  text3: '#6a6a74',
-  border: '#2a2a31',
-  primary: '#8b5cf6',
-  primaryPress: '#7a45f0',
-  primarySoft: 'rgba(139,92,246,0.18)',
-  onPrimary: '#ffffff',
-  success: '#00e676',
-  successSoft: 'rgba(0,230,118,0.15)',
-  danger: '#ff4d5e',
-  dangerSoft: 'rgba(255,77,94,0.15)',
-  pink: '#ff2d9b',
-  pinkSoft: 'rgba(255,45,155,0.16)',
-  blue: '#1e9bff',
-  blueSoft: 'rgba(30,155,255,0.16)',
-  cyan: '#1e9bff',
-  cyanSoft: 'rgba(30,155,255,0.16)',
-  teal: '#00e676',
-  tealSoft: 'rgba(0,230,118,0.15)',
-  orange: '#ff2d9b',
-  orangeSoft: 'rgba(255,45,155,0.16)',
-  gold: '#1e9bff',
-  fire: '#ff2d9b',
-  statusInk: '#ffffff',
+  text2: '#9c9ea6',
+  text3: '#7c7e88',
+
+  separator: '#2a2a30',
+  border: '#33343b',
+
+  accent: '#cbff45',
+  accentPress: '#bdf52f',
+  onAccent: '#12160a',
+  accentSoft: 'rgba(203,255,69,0.14)',
+  accentText: '#cbff45',
+
+  danger: '#ff453a',
+  dangerSoft: 'rgba(255,69,58,0.16)',
+  onDanger: '#ffffff',
+
+  scrim: 'rgba(0,0,0,0.6)',
 };
 
 /**
- * Font families loaded in the root layout via @expo-google-fonts.
- * Baloo 2 = headings, titles, the big hero numbers. Nunito = body text.
- * On native, custom font weights only apply through the exact family name, so we
- * reference the weighted variant directly instead of relying on `fontWeight`.
+ * Corner radii — continuous (squircle) curves via `borderCurve: 'continuous'`.
+ * Cards read as calm rectangles; only true pills use `pill`.
  */
-export const Font = {
-  baloo500: 'Baloo2_500Medium',
-  baloo600: 'Baloo2_600SemiBold',
-  baloo700: 'Baloo2_700Bold',
-  baloo800: 'Baloo2_800ExtraBold',
-  nunito400: 'Nunito_400Regular',
-  nunito600: 'Nunito_600SemiBold',
-  nunito700: 'Nunito_700Bold',
-  nunito800: 'Nunito_800ExtraBold',
-  nunito900: 'Nunito_900Black',
+export const Radius = {
+  card: 22,
+  cardInner: 16,
+  tile: 15,
+  control: 14,
+  chip: 11,
+  pill: 999,
+} as const;
+
+/** 4-pt spacing scale used for gaps / padding across screens. */
+export const Space = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 28,
+  xxxl: 40,
 } as const;

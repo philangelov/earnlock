@@ -5,6 +5,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Appearance } from 'react-native';
 
 import { DarkTokens, LightTokens, type Tokens } from './tokens';
 
@@ -37,6 +38,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       active = false;
     };
   }, []);
+
+  // The in-app toggle is the single source of truth for appearance. Force the native
+  // UIKit trait collection to match it so native chrome the JS theme can't reach —
+  // the tab bar, form-sheet grabber/dim, keyboard — follows the toggle too (not the
+  // device system setting). Reset to system on unmount.
+  useEffect(() => {
+    Appearance.setColorScheme(dark ? 'dark' : 'light');
+    return () => Appearance.setColorScheme('unspecified');
+  }, [dark]);
 
   const value = useMemo<ThemeContextValue>(() => {
     const setDark = (next: boolean) => {

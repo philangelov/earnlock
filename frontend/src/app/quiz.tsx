@@ -1,12 +1,15 @@
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
-import { Icon } from '@/components/Icon';
-import { PrimaryButton } from '@/components/PrimaryButton';
+import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
+import { Sym } from '@/components/Sym';
+import { haptic } from '@/lib/haptics';
 import { MC_COUNT, QUESTIONS } from '@/store/content';
-import { Font } from '@/theme/tokens';
 import { useEarnLock } from '@/store/useEarnLock';
+import { Radius, Space } from '@/theme/tokens';
+import { Type } from '@/theme/type';
 import { useTokens } from '@/theme/theme';
 
 export default function QuizScreen() {
@@ -16,254 +19,203 @@ export default function QuizScreen() {
   const qIndex = useEarnLock((s) => s.qIndex);
   const selected = useEarnLock((s) => s.selected);
   const checked = useEarnLock((s) => s.checked);
-  const quizVar = useEarnLock((s) => s.quizVar);
   const pick = useEarnLock((s) => s.pick);
   const check = useEarnLock((s) => s.check);
   const nextQuestion = useEarnLock((s) => s.nextQuestion);
 
   const q = QUESTIONS[Math.min(qIndex, QUESTIONS.length - 1)];
   const correct = selected === q.answer;
+  // Only a *correct* answer advances progress — a wrong one shouldn't bump the bar then regress
+  // after the learn-and-retry loop.
+  const qProg = Math.min(1, (qIndex + (checked && correct ? 1 : 0)) / (MC_COUNT + 1));
 
-  const qProg = Math.min(100, ((qIndex + (checked ? 1 : 0)) / (MC_COUNT + 1)) * 100);
-  const qDot = q.tag === 'BIOLOGY' ? t.success : t.gold;
-
-  const quizBack = () => router.push('/journey');
-  const quizClose = () => router.push('/home');
-
-  const quizBtnHandler = () => {
+  const onButton = () => {
     if (!checked) {
+      if (correct) haptic.success();
+      else haptic.error();
       check();
       return;
     }
-    // checked -> advance
     if (selected !== q.answer) {
-      router.push('/learning');
+      router.replace('/learning');
       return;
     }
-    const ni = qIndex + 1;
+    // Route to recap BEFORE advancing so the reset question can't flash for a frame.
+    if (qIndex + 1 >= MC_COUNT) {
+      router.replace('/recap');
+      return;
+    }
     nextQuestion();
-    if (ni >= MC_COUNT) router.push('/recap');
   };
 
-  const quizBtnLabel = checked ? (correct ? 'Continue →' : 'See why →') : 'Check';
-  const quizFbText = correct ? 'Correct — nice one!' : "Not quite. Let's learn why.";
+  const btnLabel = checked ? (correct ? 'Continue' : 'See why') : 'Check answer';
 
-  // Per-option state style (shared by both layouts).
-  const optState = (i: number): ViewStyle => {
+  const optStyle = (i: number): ViewStyle => {
     const isAnswer = i === q.answer;
     const isPicked = selected === i;
     if (!checked) {
-      if (isPicked) {
-        return { borderWidth: 2, borderColor: t.primary, backgroundColor: t.primarySoft };
-      }
-      return { borderWidth: 2, borderColor: t.border, backgroundColor: t.surface };
+      return isPicked
+        ? { borderColor: t.accent, backgroundColor: t.accentSoft }
+        : { borderColor: t.separator, backgroundColor: t.surface };
     }
-    if (isAnswer) {
-      return { borderWidth: 2, borderColor: t.success, backgroundColor: t.successSoft };
-    }
-    if (isPicked) {
-      return { borderWidth: 2, borderColor: t.danger, backgroundColor: t.dangerSoft };
-    }
-    return { borderWidth: 2, borderColor: t.border, backgroundColor: t.surface, opacity: 0.5 };
+    if (isAnswer) return { borderColor: t.accent, backgroundColor: t.accentSoft };
+    if (isPicked) return { borderColor: t.danger, backgroundColor: t.dangerSoft };
+    return { borderColor: t.separator, backgroundColor: t.surface, opacity: 0.5 };
   };
 
-  // The check / x badge for an option (null when it shouldn't show one).
-  const optBadge = (i: number, size: number) => {
+  const optBadge = (i: number) => {
     if (!checked) return null;
-    if (i === q.answer) return <Icon name="checkCircle" size={size} color={t.success} />;
-    if (selected === i) return <Icon name="xCircle" size={size} color={t.danger} />;
-    return null;
+    if (i === q.answer) return <Sym name="checkmark.circle.fill" size={22} color={t.accentText} />;
+    if (selected === i) return <Sym name="xmark.circle.fill" size={22} color={t.danger} />;
+    return <View style={styles.badgeSpacer} />;
   };
-
-  const renderOptionA = (i: number) => {
-    const opt = q.opts[i];
-    return (
-      <Pressable
-        key={i}
-        onPress={() => pick(i)}
-        style={({ pressed }) => [
-          styles.optA,
-          optState(i),
-          pressed && !checked && styles.pressScale,
-        ]}>
-        <Text style={styles.emojiA}>{opt.e}</Text>
-        <Text style={[styles.optAText, { color: t.text }]}>{opt.t}</Text>
-        {optBadge(i, 22)}
-      </Pressable>
-    );
-  };
-
-  const renderOptionB = (i: number) => {
-    const opt = q.opts[i];
-    const badge = optBadge(i, 20);
-    return (
-      <Pressable
-        key={i}
-        onPress={() => pick(i)}
-        style={({ pressed }) => [
-          styles.optB,
-          optState(i),
-          pressed && !checked && styles.pressScale,
-        ]}>
-        <Text style={styles.emojiB}>{opt.e}</Text>
-        <Text style={[styles.optBText, { color: t.text }]}>{opt.t}</Text>
-        {badge != null && <View style={styles.badgeB}>{badge}</View>}
-      </Pressable>
-    );
-  };
-
-  // Chunk options into rows of two for the grid layout.
-  const gridRows: number[][] = [];
-  for (let i = 0; i < q.opts.length; i += 2) {
-    gridRows.push(q.opts.slice(i, i + 2).map((_, k) => i + k));
-  }
 
   return (
     <Screen bottomInset>
-      {/* Progress */}
-      <View style={[styles.progressTrack, { backgroundColor: t.surface2 }]}>
-        <View style={[styles.progressFill, { width: `${qProg}%`, backgroundColor: t.primary }]} />
-      </View>
-
-      {/* Header */}
-      <View style={styles.header}>
+      {/* Top bar */}
+      <View style={styles.top}>
         <Pressable
-          onPress={quizBack}
-          style={({ pressed }) => [styles.iconBtn, pressed && styles.pressDim]}>
-          <Icon name="chevronLeft" size={22} color={t.text2} />
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          onPress={() => {
+            haptic.tap();
+            router.back();
+          }}
+          hitSlop={10}
+          style={styles.iconBtn}
+        >
+          <Sym name="chevron.left" size={20} color={t.text2} weight="semibold" />
         </Pressable>
-        <Pressable
-          onPress={quizClose}
-          style={({ pressed }) => [styles.iconBtn, pressed && styles.pressDim]}>
-          <Icon name="close" size={21} color={t.text2} />
-        </Pressable>
-      </View>
-
-      {/* Body */}
-      <ScrollView
-        style={styles.body}
-        contentContainerStyle={styles.bodyContent}
-        showsVerticalScrollIndicator={false}>
-        <View style={styles.tagRow}>
-          <View style={[styles.dot, { backgroundColor: qDot }]} />
-          <Text style={[styles.tagText, { color: qDot }]}>{q.tag}</Text>
+        <View style={[styles.track, { backgroundColor: t.fill }]}>
+          <Animated.View
+            layout={LinearTransition.duration(300)}
+            style={[styles.trackFill, { width: `${qProg * 100}%`, backgroundColor: t.accent }]}
+          />
         </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close quiz"
+          onPress={() => {
+            haptic.tap();
+            router.navigate('/today');
+          }}
+          hitSlop={10}
+          style={styles.iconBtn}
+        >
+          <Sym name="xmark" size={19} color={t.text2} weight="semibold" />
+        </Pressable>
+      </View>
 
-        <Text style={[styles.qText, { color: t.text }]}>{q.q}</Text>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[Type.overline, { color: t.accentText, textTransform: 'uppercase' }]}>
+          {q.tag}
+        </Text>
+        <Text style={[Type.title1, { color: t.text, marginTop: Space.sm }]}>{q.q}</Text>
 
-        <View style={styles.spacer} />
-
-        {quizVar === 'A' ? (
-          <View style={styles.optionsA}>{q.opts.map((_, i) => renderOptionA(i))}</View>
-        ) : (
-          <View style={styles.optionsB}>
-            {gridRows.map((row, r) => (
-              <View key={r} style={styles.gridRow}>
-                {row.map((i) => renderOptionB(i))}
-              </View>
-            ))}
-          </View>
-        )}
+        <View style={styles.options}>
+          {q.opts.map((opt, i) => (
+            <Pressable
+              key={i}
+              accessibilityRole="button"
+              accessibilityLabel={opt.t}
+              accessibilityState={{
+                selected: selected === i,
+                disabled: checked,
+              }}
+              accessibilityHint={
+                checked
+                  ? i === q.answer
+                    ? 'Correct answer'
+                    : selected === i
+                      ? 'Your answer, incorrect'
+                      : undefined
+                  : undefined
+              }
+              onPress={() => {
+                haptic.select();
+                pick(i);
+              }}
+              style={({ pressed }) => [
+                styles.opt,
+                optStyle(i),
+                pressed && !checked && styles.pressScale,
+              ]}
+            >
+              <Text style={styles.emoji}>{opt.e}</Text>
+              <Text style={[Type.bodyStrong, styles.optText, { color: t.text }]}>{opt.t}</Text>
+              {optBadge(i)}
+            </Pressable>
+          ))}
+        </View>
       </ScrollView>
 
       {/* Footer */}
       <View style={styles.footer}>
         {checked && (
-          <View
-            style={[
-              styles.fbBar,
-              { backgroundColor: correct ? t.successSoft : t.dangerSoft },
-            ]}>
-            <Text style={[styles.fbText, { color: correct ? t.success : t.danger }]}>
-              {quizFbText}
+          <Animated.View
+            entering={FadeInDown.duration(200)}
+            accessibilityLiveRegion="polite"
+            style={[styles.fb, { backgroundColor: correct ? t.accentSoft : t.dangerSoft }]}
+          >
+            <Sym
+              name={correct ? 'checkmark.circle.fill' : 'info.circle.fill'}
+              size={17}
+              color={correct ? t.accentText : t.danger}
+            />
+            <Text
+              style={[Type.subheadStrong, { color: correct ? t.accentText : t.danger, flex: 1 }]}
+            >
+              {correct ? 'Correct — nice one!' : 'Not quite — let’s learn why.'}
             </Text>
-          </View>
+          </Animated.View>
         )}
-        <PrimaryButton
-          label={quizBtnLabel}
-          disabled={!(checked || selected != null)}
-          onPress={quizBtnHandler}
-        />
+        <Button label={btnLabel} disabled={!(checked || selected != null)} onPress={onButton} />
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  progressTrack: {
-    height: 6,
-    marginTop: 2,
-    marginHorizontal: 20,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: { height: '100%', borderRadius: 3 },
-
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 13,
-    paddingHorizontal: 18,
-    paddingBottom: 2,
-  },
-  iconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  pressDim: { opacity: 0.55 },
-
-  body: { flex: 1 },
-  bodyContent: { flexGrow: 1, paddingTop: 6, paddingHorizontal: 22 },
-
-  tagRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dot: { width: 9, height: 9, borderRadius: 4.5 },
-  tagText: { fontFamily: Font.nunito800, fontSize: 12, letterSpacing: 1 },
-
-  qText: { fontFamily: Font.baloo700, fontSize: 23, lineHeight: 28.52, marginTop: 12 },
-
-  spacer: { flex: 1, minHeight: 18 },
-
-  // List (variant A)
-  optionsA: { gap: 11, marginBottom: 4 },
-  optA: {
-    width: '100%',
+  top: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 13,
-    paddingVertical: 15,
-    paddingHorizontal: 17,
-    borderRadius: 16,
+    gap: Space.md,
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.sm,
   },
-  emojiA: { fontSize: 22 },
-  optAText: { flex: 1, fontFamily: Font.nunito700, fontSize: 15 },
+  iconBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  track: { flex: 1, height: 7, borderRadius: Radius.pill, overflow: 'hidden' },
+  trackFill: { height: '100%', borderRadius: Radius.pill },
 
-  // Grid (variant B)
-  optionsB: { gap: 11, marginBottom: 4 },
-  gridRow: { flexDirection: 'row', gap: 11 },
-  optB: {
-    position: 'relative',
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    minHeight: 120,
-  },
-  emojiB: { fontSize: 30 },
-  optBText: { fontFamily: Font.nunito800, fontSize: 14.5, textAlign: 'center' },
-  badgeB: { position: 'absolute', top: 9, right: 9 },
-
-  pressScale: { transform: [{ scale: 0.97 }] },
-
-  // Footer
-  footer: { paddingTop: 8, paddingHorizontal: 22 },
-  fbBar: {
+  body: { paddingHorizontal: Space.xl, paddingTop: Space.xl, paddingBottom: Space.lg },
+  options: { gap: Space.md, marginTop: Space.xxl },
+  opt: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    paddingVertical: 16,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.cardInner,
+    borderCurve: 'continuous',
+    borderWidth: 1.5,
+  },
+  emoji: { fontSize: 24 },
+  optText: { flex: 1 },
+  badgeSpacer: { width: 22, height: 22 },
+  pressScale: { transform: [{ scale: 0.98 }] },
+
+  footer: { paddingHorizontal: Space.xl, paddingTop: Space.sm, gap: Space.md },
+  fb: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: 14,
-    marginBottom: 10,
+    borderRadius: Radius.control,
+    borderCurve: 'continuous',
   },
-  fbText: { fontFamily: Font.nunito800, fontSize: 14 },
 });

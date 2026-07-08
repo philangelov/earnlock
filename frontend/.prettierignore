@@ -1,0 +1,14 @@
+# Dependencies & build output
+node_modules/
+dist/
+.expo/
+
+# Generated native projects (expo prebuild output)
+ios/
+android/
+# Apple Screen Time extension targets — scaffolded by the react-native-device-activity
+# config plugin on prebuild (only when Screen Time is enabled). Regenerated, not hand-edited.
+targets/
+
+# Lockfile
+bun.lock

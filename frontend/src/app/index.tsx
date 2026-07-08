@@ -1,101 +1,118 @@
-import { useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
+import { Redirect, useRouter } from 'expo-router';
+import { useSyncExternalStore } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { Icon, type IconName } from '@/components/Icon';
-import { PrimaryButton } from '@/components/PrimaryButton';
+import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
-import { Font } from '@/theme/tokens';
+import { Sym, type SymName } from '@/components/Sym';
+import { useEarnLock } from '@/store/useEarnLock';
+import { Radius, Space } from '@/theme/tokens';
+import { Type } from '@/theme/type';
 import { useTokens } from '@/theme/theme';
 
 function Benefit({
   icon,
-  iconColor,
-  iconBg,
   title,
   desc,
+  accent,
+  delay,
 }: {
-  icon: IconName;
-  iconColor: string;
-  iconBg: string;
+  icon: SymName;
   title: string;
   desc: string;
+  accent?: boolean;
+  delay: number;
 }) {
   const t = useTokens();
   return (
-    <View style={styles.benefitRow}>
-      <View style={[styles.benefitIcon, { backgroundColor: iconBg }]}>
-        <Icon name={icon} size={23} color={iconColor} />
+    <Animated.View entering={FadeInDown.duration(420).delay(delay)} style={styles.benefit}>
+      <View style={[styles.benefitIcon, { backgroundColor: accent ? t.accentSoft : t.fill }]}>
+        <Sym name={icon} size={20} color={accent ? t.accentText : t.text} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.benefitTitle, { color: t.text }]}>{title}</Text>
-        <Text style={[styles.benefitDesc, { color: t.text2 }]}>{desc}</Text>
+        <Text style={[Type.headline, { color: t.text }]}>{title}</Text>
+        <Text style={[Type.subhead, { color: t.text2, marginTop: 2 }]}>{desc}</Text>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
 export default function WelcomeScreen() {
   const t = useTokens();
   const router = useRouter();
+  const onboarded = useEarnLock((s) => s.onboarded);
+
+  // Wait for the persisted store to rehydrate so a returning user never flashes onboarding.
+  const hydrated = useSyncExternalStore(
+    (onChange) => useEarnLock.persist.onFinishHydration(onChange),
+    () => useEarnLock.persist.hasHydrated(),
+  );
+
+  if (!hydrated) return null;
+  if (onboarded) return <Redirect href="/today" />;
 
   return (
-    <Screen scroll contentStyle={styles.content}>
-      <Text style={[styles.title, { color: t.text }]}>Welcome to{'\n'}EarnLock</Text>
-      <Text style={[styles.subtitle, { color: t.text2 }]}>
-        Turn screen time into a reward you earn by learning.
+    <Screen scroll bottomInset contentStyle={styles.content}>
+      <View style={[styles.badge, { backgroundColor: t.accent }]}>
+        <Sym name="bolt.fill" size={30} color={t.onAccent} weight="bold" />
+      </View>
+
+      <Text style={[Type.largeTitle, { color: t.text, marginTop: Space.xl }]}>
+        Screen time,{'\n'}earned by learning.
+      </Text>
+      <Text style={[Type.body, { color: t.text2, marginTop: Space.md }]}>
+        EarnLock keeps distracting apps locked until a few quick questions are answered — turning
+        idle scrolling into real progress.
       </Text>
 
       <View style={styles.benefits}>
         <Benefit
-          icon="lockRound"
-          iconColor={t.primary}
-          iconBg={t.primarySoft}
+          icon="lock.fill"
           title="Lock the distractions"
-          desc="Pick the apps that eat your time. They stay locked until you learn."
+          desc="Choose the apps that eat the day. They stay shielded until time is earned."
+          delay={80}
         />
         <Benefit
-          icon="star"
-          iconColor={t.success}
-          iconBg={t.successSoft}
-          title="Earn time by learning"
-          desc="Answer quick AI questions from your own notes to unlock minutes."
+          icon="bolt.fill"
+          title="Learn to unlock"
+          desc="Answer questions from your own notes to earn 15 minutes at a time."
+          accent
+          delay={160}
         />
         <Benefit
-          icon="flame"
-          iconColor={t.fire}
-          iconBg="rgba(255,106,69,0.14)"
-          title="Keep your streak alive"
-          desc="Climb your knowledge map and build a daily learning streak."
+          icon="flame.fill"
+          title="Build the habit"
+          desc="Keep a daily streak and watch subjects climb toward mastery."
+          delay={240}
         />
       </View>
 
       <View style={styles.spacer} />
-      <PrimaryButton label="Get started" onPress={() => router.push('/grade')} />
+      <Button label="Get started" onPress={() => router.push('/setup')} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { paddingTop: 6, paddingHorizontal: 26, paddingBottom: 24 },
-  title: {
-    fontFamily: Font.baloo800,
-    fontSize: 31,
-    lineHeight: 34,
-    letterSpacing: -0.4,
-    marginTop: 14,
-  },
-  subtitle: { fontFamily: Font.nunito600, fontSize: 15.5, marginTop: 10, lineHeight: 22 },
-  benefits: { gap: 24, marginTop: 38 },
-  benefitRow: { flexDirection: 'row', gap: 15, alignItems: 'flex-start' },
-  benefitIcon: {
-    width: 47,
-    height: 47,
-    borderRadius: 15,
+  content: { paddingHorizontal: Space.xxl, paddingTop: Space.xxl, paddingBottom: Space.sm },
+  badge: {
+    width: 60,
+    height: 60,
+    borderRadius: Radius.card,
+    borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  benefitTitle: { fontFamily: Font.baloo700, fontSize: 18 },
-  benefitDesc: { fontFamily: Font.nunito600, fontSize: 14.5, lineHeight: 20.6, marginTop: 2 },
-  spacer: { flex: 1, minHeight: 20 },
+  benefits: { gap: Space.xl, marginTop: Space.xxxl },
+  benefit: { flexDirection: 'row', gap: Space.md, alignItems: 'flex-start' },
+  benefitIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: Radius.control,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spacer: { flex: 1, minHeight: Space.xxl },
 });

@@ -1,12 +1,15 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Icon } from '@/components/Icon';
+import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
-import { MC_COUNT, QUESTIONS } from '@/store/content';
+import { Sym } from '@/components/Sym';
+import { haptic } from '@/lib/haptics';
+import { QUESTIONS } from '@/store/content';
 import { useEarnLock } from '@/store/useEarnLock';
-import { Font } from '@/theme/tokens';
+import { Radius, Space } from '@/theme/tokens';
+import { Type } from '@/theme/type';
 import { useTokens } from '@/theme/theme';
 
 export default function LearningScreen() {
@@ -14,151 +17,108 @@ export default function LearningScreen() {
   const router = useRouter();
 
   const qIndex = useEarnLock((s) => s.qIndex);
-  const nextQuestion = useEarnLock((s) => s.nextQuestion);
+  const retryQuestion = useEarnLock((s) => s.retryQuestion);
+  const q = QUESTIONS[Math.min(qIndex, QUESTIONS.length - 1)];
+  const answer = q.opts[q.answer];
 
-  const learnExplain = QUESTIONS[Math.min(qIndex, QUESTIONS.length - 1)].explain;
-
-  const [lockLeft, setLockLeft] = useState(10);
-  useEffect(() => {
-    const id = setInterval(
-      () => setLockLeft((v) => (v <= 1 ? (clearInterval(id), 0) : v - 1)),
-      1000,
-    );
-    return () => clearInterval(id);
-  }, []);
-
-  const lockPct = ((10 - lockLeft) / 10) * 100;
-  const locked = lockLeft > 0;
-  const learnBtnLabel = locked ? 'Keep reading… ' + lockLeft + 's' : "I'm ready! →";
-
-  const learnContinue = () => {
-    const ni = qIndex + 1;
-    nextQuestion();
-    if (ni >= MC_COUNT) router.replace('/recap');
-    else router.replace('/quiz');
+  const tryAgain = () => {
+    retryQuestion();
+    router.replace('/quiz');
   };
 
   return (
     <Screen bottomInset>
-      {/* Progress */}
-      <View style={[styles.progress, { backgroundColor: t.surface2 }]}>
-        <View style={[styles.progressFill, { backgroundColor: t.primary }]} />
+      <View style={styles.top}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          hitSlop={12}
+          onPress={() => {
+            haptic.tap();
+            router.navigate('/today');
+          }}
+          style={({ pressed }) => [
+            styles.close,
+            { backgroundColor: t.fill },
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <Sym name="xmark" size={16} color={t.text2} weight="semibold" />
+        </Pressable>
       </View>
-
-      {/* Top icons */}
-      <View style={styles.topRow}>
-        <Icon name="bookmark" size={20} color={t.text3} />
-        <Icon name="share" size={20} color={t.text3} />
-      </View>
-
-      {/* Body */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.body}
-        showsVerticalScrollIndicator={false}>
-        <View style={styles.tag}>
-          <View style={[styles.tagDot, { backgroundColor: t.fire }]} />
-          <Text style={[styles.tagText, { color: t.fire }]}>LEARNING MODE</Text>
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.icon, { backgroundColor: t.accentSoft }]}>
+          <Sym name="lightbulb.fill" size={26} color={t.accentText} />
         </View>
+        <Text style={[Type.title1, { color: t.text, marginTop: Space.lg }]}>
+          Let’s learn this one
+        </Text>
+        <Text style={[Type.body, { color: t.text2, marginTop: 6 }]}>
+          No penalty — read it through, then try again.
+        </Text>
 
-        <View style={[styles.starBox, { backgroundColor: t.primarySoft }]}>
-          <Icon name="star" size={34} color={t.primary} />
-        </View>
+        <Card style={styles.qCard}>
+          <Text style={[Type.overline, { color: t.text3, textTransform: 'uppercase' }]}>
+            {q.tag}
+          </Text>
+          <Text style={[Type.title3, { color: t.text, marginTop: 6 }]}>{q.q}</Text>
 
-        <Text style={[styles.title, { color: t.text }]}>Not quite — here's the idea</Text>
-        <Text style={[styles.explain, { color: t.text2 }]}>{learnExplain}</Text>
+          <View style={[styles.answer, { backgroundColor: t.accentSoft }]}>
+            <Sym name="checkmark.circle.fill" size={20} color={t.accentText} />
+            <Text style={[Type.bodyStrong, { color: t.text, flex: 1 }]}>
+              {answer.e} {answer.t}
+            </Text>
+          </View>
+
+          <Text style={[Type.callout, { color: t.text2, marginTop: Space.lg, lineHeight: 23 }]}>
+            {q.explain}
+          </Text>
+        </Card>
       </ScrollView>
 
-      {/* Footer */}
       <View style={styles.footer}>
-        <Pressable
-          disabled={locked}
-          onPress={locked ? undefined : learnContinue}
-          style={({ pressed }) => [
-            styles.btn,
-            locked
-              ? [styles.btnLocked, { backgroundColor: t.surface2 }]
-              : [styles.btnReady, { backgroundColor: t.primary, shadowColor: t.primary }],
-            !locked && pressed && styles.pressed,
-          ]}>
-          {locked && (
-            <View
-              style={[styles.btnFill, { width: `${lockPct}%`, backgroundColor: t.primarySoft }]}
-            />
-          )}
-          <Text style={[styles.btnLabel, { color: locked ? t.text2 : t.onPrimary }]}>
-            {learnBtnLabel}
-          </Text>
-        </Pressable>
+        <Button label="Try again" onPress={tryAgain} />
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  progress: {
-    height: 6,
-    borderRadius: 3,
-    marginTop: 2,
-    marginHorizontal: 20,
-    overflow: 'hidden',
-  },
-  progressFill: { height: '100%', width: '66%', borderRadius: 3 },
-  topRow: {
+  top: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 16,
-    paddingTop: 14,
-    paddingHorizontal: 22,
-    paddingBottom: 2,
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.sm,
   },
-  body: {
-    flexGrow: 1,
-    alignItems: 'center',
-    paddingTop: 16,
-    paddingHorizontal: 26,
-    paddingBottom: 0,
-  },
-  tag: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tagDot: { width: 9, height: 9, borderRadius: 4.5 },
-  tagText: { fontFamily: Font.nunito800, fontSize: 12, letterSpacing: 1 },
-  starBox: {
-    width: 66,
-    height: 66,
-    borderRadius: 20,
-    marginTop: 22,
+  close: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: {
-    fontFamily: Font.baloo700,
-    fontSize: 20,
-    marginTop: 20,
-    textAlign: 'center',
-  },
-  explain: {
-    fontFamily: Font.nunito400,
-    fontSize: 16.5,
-    lineHeight: 24.75,
-    marginTop: 14,
-    textAlign: 'center',
-  },
-  footer: { paddingTop: 8, paddingHorizontal: 22, paddingBottom: 0 },
-  btn: {
-    width: '100%',
-    borderRadius: 19,
-    padding: 17,
+  body: { paddingHorizontal: Space.xl, paddingTop: Space.md, paddingBottom: Space.lg },
+  icon: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.card,
+    borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnLocked: { overflow: 'hidden' },
-  btnReady: {
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 8,
+  qCard: { padding: Space.xl, marginTop: Space.xxl },
+  answer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: Space.md,
+    borderRadius: Radius.control,
+    borderCurve: 'continuous',
+    marginTop: Space.lg,
   },
-  btnFill: { position: 'absolute', left: 0, top: 0, bottom: 0 },
-  btnLabel: { fontFamily: Font.baloo700, fontSize: 17 },
-  pressed: { transform: [{ scale: 0.97 }] },
+  footer: { paddingHorizontal: Space.xl, paddingTop: Space.sm },
 });

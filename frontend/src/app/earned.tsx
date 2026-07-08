@@ -1,24 +1,36 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { Icon } from '@/components/Icon';
-import { PrimaryButton } from '@/components/PrimaryButton';
+import { Button } from '@/components/Button';
 import { ProgressRing } from '@/components/ProgressRing';
 import { Screen } from '@/components/Screen';
-import { APP_DEFS } from '@/store/content';
+import { Sym } from '@/components/Sym';
+import { haptic } from '@/lib/haptics';
+import { useScreenTime } from '@/lib/screenTime/store';
 import { useEarnLock } from '@/store/useEarnLock';
-import { Font } from '@/theme/tokens';
+import { Radius, Space } from '@/theme/tokens';
+import { Type } from '@/theme/type';
 import { useTokens } from '@/theme/theme';
-
-const C2 = 364.424;
 
 export default function EarnedScreen() {
   const t = useTokens();
   const router = useRouter();
   const claim = useEarnLock((s) => s.claim);
-  const [earned, setEarned] = useState(0);
+  const count = useScreenTime((s) => s.selection.total);
 
+  // Grant the reward the moment the celebration appears — not on the CTA — so the "unlocked"
+  // copy is true immediately and the reward can't be lost by swiping the screen away.
+  const claimed = useRef(false);
+  useEffect(() => {
+    if (claimed.current) return;
+    claimed.current = true;
+    claim();
+    haptic.success();
+  }, [claim]);
+
+  const [earned, setEarned] = useState(0);
   useEffect(() => {
     let v = 0;
     const id = setInterval(() => {
@@ -28,90 +40,63 @@ export default function EarnedScreen() {
         v = 15;
       }
       setEarned(v);
-    }, 55);
+    }, 45);
     return () => clearInterval(id);
   }, []);
 
-  const earnRingOffset = C2 * (1 - earned / 15);
-
   return (
-    <Screen scroll contentStyle={styles.content}>
-      <View style={styles.spacerTop} />
+    <Screen scroll bottomInset contentStyle={styles.content}>
+      <View style={styles.spacer} />
 
-      <ProgressRing
-        size={216}
-        viewBox={140}
-        rings={[
-          {
-            r: 58,
-            strokeWidth: 13,
-            trackColor: t.surface2,
-            color: t.success,
-            circumference: 364.42,
-            offset: earnRingOffset,
-          },
-        ]}>
-        <View style={styles.overlay}>
-          <Text style={[styles.earnedNum, { color: t.text }]}>+{earned}</Text>
-          <Text style={[styles.earnedLabel, { color: t.success }]}>MINUTES EARNED</Text>
-        </View>
-      </ProgressRing>
+      <Animated.View entering={FadeInDown.duration(320)}>
+        <ProgressRing
+          size={208}
+          viewBox={140}
+          rings={[
+            { r: 58, strokeWidth: 12, trackColor: t.fill, color: t.accent, progress: earned / 15 },
+          ]}
+        >
+          <View style={styles.center}>
+            <Text style={[Type.display, { color: t.text }]}>+{earned}</Text>
+            <Text style={[Type.overline, { color: t.accentText, textTransform: 'uppercase' }]}>
+              minutes earned
+            </Text>
+          </View>
+        </ProgressRing>
+      </Animated.View>
 
-      <Text style={[styles.title, { color: t.text }]}>Nice work!</Text>
-      <Text style={[styles.desc, { color: t.text2 }]}>
-        You answered 5 correct — that's 15 minutes of screen time. Your apps are unlocked.
+      <Text style={[Type.title1, { color: t.text, marginTop: Space.xxl }]}>Nice work!</Text>
+      <Text style={[Type.body, styles.desc, { color: t.text2 }]}>
+        Lesson complete — you earned 15 minutes and your apps are unlocked.
       </Text>
 
-      <View style={styles.apps}>
-        {APP_DEFS.map((def) => (
-          <View key={def.key} style={[styles.tile, { backgroundColor: def.tile }]}>
-            <Icon name={def.icon} size={22} color="#fff" />
-          </View>
-        ))}
+      <View style={[styles.chip, { backgroundColor: t.accentSoft }]}>
+        <Sym name="lock.open.fill" size={15} color={t.accentText} />
+        <Text style={[Type.subheadStrong, { color: t.accentText }]}>
+          {count > 0
+            ? `${count} ${count === 1 ? 'app or category' : 'apps & categories'} unlocked`
+            : 'Your apps are unlocked'}
+        </Text>
       </View>
 
-      <View style={styles.spacerBottom} />
-      <PrimaryButton
-        label="Start using my apps"
-        onPress={() => {
-          claim();
-          router.replace('/home');
-        }}
-      />
+      <View style={styles.spacer} />
+      <Button label="Start using my apps" onPress={() => router.navigate('/today')} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { paddingTop: 2, paddingHorizontal: 26, paddingBottom: 20, alignItems: 'center' },
-  spacerTop: { flex: 1, minHeight: 16 },
-  overlay: { alignItems: 'center' },
-  earnedNum: {
-    fontFamily: Font.baloo800,
-    fontSize: 60,
-    textAlign: 'center',
-  },
-  earnedLabel: {
-    fontFamily: Font.nunito800,
-    fontSize: 12,
-    letterSpacing: 1,
-    marginTop: 4,
-  },
-  title: { fontFamily: Font.baloo800, fontSize: 26, marginTop: 26 },
-  desc: {
-    fontFamily: Font.nunito600,
-    fontSize: 15,
-    marginTop: 8,
-    lineHeight: 21.75,
-    textAlign: 'center',
-  },
-  apps: { flexDirection: 'row', gap: 12, marginTop: 24, alignItems: 'center' },
-  tile: {
-    width: 52,
-    height: 52,
-    borderRadius: 15,
+  content: { paddingHorizontal: Space.xl, paddingTop: Space.sm, alignItems: 'center', flexGrow: 1 },
+  spacer: { flex: 1, minHeight: Space.lg },
+  center: { alignItems: 'center', gap: 4 },
+  desc: { marginTop: Space.sm, textAlign: 'center', maxWidth: 300 },
+  chip: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 9,
+    paddingHorizontal: 15,
+    borderRadius: Radius.pill,
+    marginTop: Space.xl,
   },
-  spacerBottom: { flex: 1, minHeight: 18 },
 });
