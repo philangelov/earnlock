@@ -80,14 +80,39 @@ def validate_grade_or_age(value):
         age = int(match.group(1))
         if MIN_AGE <= age <= MAX_AGE:
             return f"Age {age}"
-        raise ValidationError(
-            f"age must be between {MIN_AGE} and {MAX_AGE}."
-        )
+        raise ValidationError(f"age must be between {MIN_AGE} and {MAX_AGE}.")
 
     raise ValidationError(
         "grade_or_age must be a recognised grade "
         f"(e.g. one of: {', '.join(VALID_GRADES)}) or an age {MIN_AGE}-{MAX_AGE}."
     )
+
+
+def validate_knowledge_import(body, max_chars):
+    """Validate a POST /knowledge/import body.
+
+    Accepts ``text`` (the study material, required) and an optional ``source_type``
+    ('text' | 'link'; default 'text'). Whitespace is collapsed and the text is capped at
+    ``max_chars`` (per the knowledge_materials contract, migration 0004). Returns
+    ``(raw_text, source_type)`` or raises ValidationError.
+    """
+    if not isinstance(body, dict):
+        raise ValidationError("Request body must be a JSON object.")
+
+    text = body.get("text")
+    if not isinstance(text, str) or not text.strip():
+        raise ValidationError("text must be a non-empty string.")
+
+    source_type = body.get("source_type", "text")
+    if source_type not in ("text", "link"):
+        raise ValidationError("source_type must be 'text' or 'link'.")
+
+    # Normalize: collapse runs of whitespace, then cap length.
+    normalized = re.sub(r"\s+", " ", text).strip()
+    if len(normalized) > max_chars:
+        normalized = normalized[:max_chars].rstrip()
+
+    return normalized, source_type
 
 
 def validate_profile_update(body):
@@ -112,8 +137,6 @@ def validate_profile_update(body):
         )
 
     if not user_fields and not profile_fields:
-        raise ValidationError(
-            "Provide at least one of: grade_or_age, focus_subjects."
-        )
+        raise ValidationError("Provide at least one of: grade_or_age, focus_subjects.")
 
     return user_fields, profile_fields
