@@ -1,77 +1,71 @@
-import {
-  Baloo2_500Medium,
-  Baloo2_600SemiBold,
-  Baloo2_700Bold,
-  Baloo2_800ExtraBold,
-} from '@expo-google-fonts/baloo-2';
-import {
-  Nunito_400Regular,
-  Nunito_600SemiBold,
-  Nunito_700Bold,
-  Nunito_800ExtraBold,
-  Nunito_900Black,
-} from '@expo-google-fonts/nunito';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+/**
+ * Root layout — providers + the native Stack. Uses the system font throughout (no custom font
+ * gate), so the first frame is instant. On mount it hydrates the Screen Time facade and mounts
+ * the lock-enforcement bridge (store clock → shield/unshield). The splash hides once the
+ * persisted theme is ready so the app opens in the user's chosen appearance.
+ */
+import { Stack, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useMemo } from 'react';
+import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { useLockEnforcement } from '@/lib/screenTime/enforcement';
+import { useScreenTime } from '@/lib/screenTime/store';
+import { makeNavTheme } from '@/theme/navTheme';
 import { ThemeProvider, useThemeMode, useTokens } from '@/theme/theme';
 
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const t = useTokens();
-  const { dark } = useThemeMode();
+  const { dark, ready } = useThemeMode();
+  const navTheme = useMemo(() => makeNavTheme(dark, t), [dark, t]);
+
+  // Re-read Screen Time on launch and whenever the app returns to the foreground, so status +
+  // selection count stay fresh after the system authorization sheet, the app picker, or changes
+  // made in iOS Settings.
+  const refreshScreenTime = useScreenTime((s) => s.refresh);
+  useEffect(() => {
+    refreshScreenTime();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshScreenTime();
+    });
+    return () => sub.remove();
+  }, [refreshScreenTime]);
+
+  // Keep the OS shield in sync with the earn clock for the whole app lifetime.
+  useLockEnforcement();
+
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
+
   return (
-    <>
+    <NavigationThemeProvider value={navTheme}>
       <StatusBar style={dark ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: t.bg },
-        }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="grade" />
-        <Stack.Screen name="subjects" />
-        <Stack.Screen name="import" />
-        <Stack.Screen name="blacklist" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="quiz" />
-        <Stack.Screen name="learning" />
-        <Stack.Screen name="recap" />
-        <Stack.Screen name="earned" />
-        <Stack.Screen name="wakeup" />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
         <Stack.Screen
           name="sos"
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
+          options={{
+            presentation: 'formSheet',
+            sheetGrabberVisible: true,
+            sheetAllowedDetents: 'fitToContents',
+            sheetCornerRadius: 28,
+            contentStyle: { backgroundColor: t.surface },
+          }}
+        />
+        <Stack.Screen
+          name="locked"
+          options={{ presentation: 'fullScreenModal', animation: 'fade' }}
         />
       </Stack>
-    </>
+    </NavigationThemeProvider>
   );
 }
 
 export default function RootLayout() {
-  const [loaded] = useFonts({
-    Nunito_400Regular,
-    Nunito_600SemiBold,
-    Nunito_700Bold,
-    Nunito_800ExtraBold,
-    Nunito_900Black,
-    Baloo2_500Medium,
-    Baloo2_600SemiBold,
-    Baloo2_700Bold,
-    Baloo2_800ExtraBold,
-  });
-
-  useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
-  }, [loaded]);
-
-  if (!loaded) return null;
-
   return (
     <SafeAreaProvider>
       <ThemeProvider>

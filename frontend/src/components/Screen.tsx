@@ -43,7 +43,11 @@ export function Screen({
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[{ flexGrow: 1, paddingBottom }, contentStyle]}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
           {children}
         </ScrollView>
       ) : (

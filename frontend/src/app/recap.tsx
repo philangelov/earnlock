@@ -1,21 +1,16 @@
 import { useRouter } from 'expo-router';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type TextStyle,
-  type ViewStyle,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { Icon } from '@/components/Icon';
-import { PrimaryButton } from '@/components/PrimaryButton';
+import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
-import { RECAP } from '@/store/content';
-import { Font } from '@/theme/tokens';
-import { useTokens } from '@/theme/theme';
+import { Sym } from '@/components/Sym';
+import { haptic } from '@/lib/haptics';
+import { MC_COUNT, RECAP } from '@/store/content';
 import { useEarnLock } from '@/store/useEarnLock';
+import { Radius, Space } from '@/theme/tokens';
+import { Type } from '@/theme/type';
+import { useTokens } from '@/theme/theme';
 
 export default function RecapScreen() {
   const t = useTokens();
@@ -25,205 +20,201 @@ export default function RecapScreen() {
   const recapChecked = useEarnLock((s) => s.recapChecked);
   const pickRecap = useEarnLock((s) => s.pickRecap);
   const checkRecap = useEarnLock((s) => s.checkRecap);
+  const retryRecap = useEarnLock((s) => s.retryRecap);
 
-  const recapPre = RECAP.pre;
-  const recapPost = RECAP.post;
-  const options = RECAP.options;
-  const answer = RECAP.answer;
-  const recapBlank = recapPick || '';
-  const recapCorrect = recapPick === RECAP.answer;
+  const correct = recapPick === RECAP.answer;
+  // Derived from flow state: all MC done, plus this final step once it's answered correctly.
+  const progress = (MC_COUNT + (recapChecked && correct ? 1 : 0)) / (MC_COUNT + 1);
 
-  const quizBack = () => router.push('/journey');
-  const quizClose = () => router.push('/home');
-
-  // Blank chip state (box + text color).
-  let blankBox: ViewStyle;
-  let blankColor: string;
-  if (recapChecked) {
-    if (recapCorrect) {
-      blankBox = { borderWidth: 2, borderColor: t.success, backgroundColor: t.successSoft };
-      blankColor = t.success;
-    } else {
-      blankBox = { borderWidth: 2, borderColor: t.danger, backgroundColor: t.dangerSoft };
-      blankColor = t.danger;
+  const blankStyle = (): ViewStyle => {
+    if (recapChecked) {
+      return correct
+        ? { borderColor: t.accent, backgroundColor: t.accentSoft }
+        : { borderColor: t.danger, backgroundColor: t.dangerSoft };
     }
-  } else if (recapPick) {
-    blankBox = { borderWidth: 2, borderColor: t.primary, backgroundColor: t.primarySoft };
-    blankColor = t.text;
-  } else {
-    blankBox = {
-      borderWidth: 2,
-      borderStyle: 'dashed',
-      borderColor: t.border,
-      backgroundColor: t.surface2,
-    };
-    blankColor = t.text3;
-  }
+    if (recapPick) return { borderColor: t.accent, backgroundColor: t.accentSoft };
+    return { borderColor: t.border, backgroundColor: t.fill, borderStyle: 'dashed' };
+  };
 
   const chipStyle = (w: string): ViewStyle => {
     if (!recapChecked) {
-      if (recapPick === w) {
-        return { borderWidth: 2, borderColor: t.primary, backgroundColor: t.primarySoft };
-      }
-      return { borderWidth: 2, borderColor: t.border, backgroundColor: t.surface };
+      return recapPick === w
+        ? { borderColor: t.accent, backgroundColor: t.accentSoft }
+        : { borderColor: t.separator, backgroundColor: t.surface };
     }
-    if (w === answer) {
-      return { borderWidth: 2, borderColor: t.success, backgroundColor: t.successSoft };
-    }
-    if (recapPick === w) {
-      return { borderWidth: 2, borderColor: t.danger, backgroundColor: t.dangerSoft };
-    }
-    return { borderWidth: 2, borderColor: t.border, backgroundColor: t.surface, opacity: 0.55 };
+    if (w === RECAP.answer) return { borderColor: t.accent, backgroundColor: t.accentSoft };
+    if (recapPick === w) return { borderColor: t.danger, backgroundColor: t.dangerSoft };
+    return { borderColor: t.separator, backgroundColor: t.surface, opacity: 0.5 };
   };
 
-  const recapFbText = recapCorrect ? 'Correct — 180°!' : "Not quite — it's 180°.";
-  const fbColor = recapCorrect ? t.success : t.danger;
-  const fbBg = recapCorrect ? t.successSoft : t.dangerSoft;
-
-  const recapBtnLabel = recapChecked ? 'Continue →' : 'Check';
-  const recapBtnDisabled = !(recapPick || recapChecked);
-  const onBtn = () => (recapChecked ? router.push('/earned') : checkRecap());
-
-  const sentenceText: TextStyle = {
-    fontFamily: Font.nunito700,
-    fontSize: 20,
-    lineHeight: 35,
-    color: t.text2,
+  const onButton = () => {
+    if (recapChecked) {
+      if (correct) router.replace('/earned');
+      else retryRecap();
+      return;
+    }
+    if (correct) haptic.success();
+    else haptic.error();
+    checkRecap();
   };
 
   return (
     <Screen bottomInset>
-      {/* Progress */}
-      <View style={[styles.progressTrack, { backgroundColor: t.surface2 }]}>
-        <View style={[styles.progressFill, { backgroundColor: t.primary }]} />
+      {/* Top bar */}
+      <View style={styles.top}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          onPress={() => {
+            haptic.tap();
+            router.back();
+          }}
+          hitSlop={10}
+          style={styles.iconBtn}
+        >
+          <Sym name="chevron.left" size={20} color={t.text2} weight="semibold" />
+        </Pressable>
+        <View style={[styles.track, { backgroundColor: t.fill }]}>
+          <View
+            style={[styles.trackFill, { width: `${progress * 100}%`, backgroundColor: t.accent }]}
+          />
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close quiz"
+          onPress={() => {
+            haptic.tap();
+            router.navigate('/today');
+          }}
+          hitSlop={10}
+          style={styles.iconBtn}
+        >
+          <Sym name="xmark" size={19} color={t.text2} weight="semibold" />
+        </Pressable>
       </View>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={quizBack} hitSlop={8}>
-          <Icon name="chevronLeft" size={22} color={t.text3} />
-        </Pressable>
-        <Pressable onPress={quizClose} hitSlop={8}>
-          <Icon name="close" size={21} color={t.text3} />
-        </Pressable>
-      </View>
-
-      {/* Body */}
       <ScrollView
-        style={styles.bodyScroll}
+        style={{ flex: 1 }}
         contentContainerStyle={styles.body}
-        showsVerticalScrollIndicator={false}>
-        <View style={styles.tagRow}>
-          <View style={[styles.tagDot, { backgroundColor: t.fire }]} />
-          <Text style={[styles.tagText, { color: t.fire }]}>RECAP</Text>
-        </View>
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[Type.overline, { color: t.accentText, textTransform: 'uppercase' }]}>
+          Recap
+        </Text>
+        <Text style={[Type.title1, { color: t.text, marginTop: Space.sm }]}>Fill in the blank</Text>
 
-        <Text style={[styles.fillTitle, { color: t.text }]}>Fill in the blank</Text>
-
-        <View style={styles.sentenceRow}>
-          <Text style={sentenceText}>{recapPre + ' '}</Text>
-          <View style={[styles.blankChip, blankBox]}>
-            <Text style={[styles.blankText, { color: blankColor }]}>{recapBlank}</Text>
+        <View style={styles.sentence}>
+          <Text style={[Type.title3, styles.sentenceText, { color: t.text2 }]}>{RECAP.pre} </Text>
+          <View style={[styles.blank, blankStyle()]}>
+            <Text style={[Type.title3, { color: recapChecked && !correct ? t.danger : t.text }]}>
+              {recapPick || '?'}
+            </Text>
           </View>
-          <Text style={sentenceText}>{' ' + recapPost}</Text>
+          <Text style={[Type.title3, styles.sentenceText, { color: t.text2 }]}> {RECAP.post}</Text>
         </View>
 
-        <View style={styles.spacer} />
-
-        <View style={styles.chipsRow}>
-          {options.map((w) => (
+        <View style={styles.chips}>
+          {RECAP.options.map((w) => (
             <Pressable
               key={w}
-              onPress={() => pickRecap(w)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: recapPick === w }}
+              onPress={() => {
+                haptic.select();
+                pickRecap(w);
+              }}
               style={({ pressed }) => [
                 styles.chip,
                 chipStyle(w),
-                pressed && !recapChecked && styles.pressed,
-              ]}>
-              <Text style={[styles.chipText, { color: t.text }]}>{w}</Text>
+                pressed && !recapChecked && styles.pressScale,
+              ]}
+            >
+              <Text style={[Type.title3, { color: t.text }]}>{w}</Text>
             </Pressable>
           ))}
         </View>
       </ScrollView>
 
-      {/* Footer */}
       <View style={styles.footer}>
         {recapChecked && (
-          <View style={[styles.feedback, { backgroundColor: fbBg }]}>
-            <Text style={[styles.feedbackText, { color: fbColor }]}>{recapFbText}</Text>
-          </View>
+          <Animated.View
+            entering={FadeInDown.duration(200)}
+            accessibilityLiveRegion="polite"
+            style={[styles.fb, { backgroundColor: correct ? t.accentSoft : t.dangerSoft }]}
+          >
+            <Sym
+              name={correct ? 'checkmark.circle.fill' : 'info.circle.fill'}
+              size={17}
+              color={correct ? t.accentText : t.danger}
+            />
+            <Text
+              style={[Type.subheadStrong, { color: correct ? t.accentText : t.danger, flex: 1 }]}
+            >
+              {correct ? 'Correct — it’s 180°!' : 'Not quite — give it another go.'}
+            </Text>
+          </Animated.View>
         )}
-        <PrimaryButton label={recapBtnLabel} disabled={recapBtnDisabled} onPress={onBtn} />
+        <Button
+          label={recapChecked ? (correct ? 'Claim your reward' : 'Try again') : 'Check answer'}
+          disabled={!(recapPick || recapChecked)}
+          onPress={onButton}
+        />
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  progressTrack: {
-    height: 6,
-    marginTop: 2,
-    marginHorizontal: 20,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: { width: '90%', height: '100%', borderRadius: 3 },
-  header: {
+  top: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 13,
-    paddingHorizontal: 20,
-    paddingBottom: 2,
+    gap: Space.md,
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.sm,
   },
-  bodyScroll: { flex: 1 },
-  body: { flexGrow: 1, paddingTop: 6, paddingHorizontal: 24, paddingBottom: 0 },
-  tagRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tagDot: { width: 9, height: 9, borderRadius: 4.5 },
-  tagText: { fontFamily: Font.nunito800, fontSize: 12, letterSpacing: 1 },
-  fillTitle: { fontFamily: Font.baloo700, fontSize: 20, marginTop: 8 },
-  sentenceRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    marginTop: 22,
-  },
-  blankChip: {
-    minWidth: 76,
-    height: 40,
-    borderRadius: 11,
-    paddingHorizontal: 12,
+  iconBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  track: { flex: 1, height: 7, borderRadius: Radius.pill, overflow: 'hidden' },
+  trackFill: { height: '100%', borderRadius: Radius.pill },
+
+  body: { flexGrow: 1, paddingHorizontal: Space.xl, paddingTop: Space.xl },
+  sentence: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: Space.xxl },
+  sentenceText: { lineHeight: 40 },
+  blank: {
+    minWidth: 70,
+    height: 42,
+    borderRadius: Radius.chip,
+    borderCurve: 'continuous',
+    borderWidth: 2,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  blankText: { fontFamily: Font.baloo700, fontSize: 18 },
-  spacer: { flex: 1, minHeight: 22 },
-  chipsRow: {
+  chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: Space.md,
+    marginTop: Space.xxxl,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
   },
   chip: {
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 14,
+    minWidth: 78,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    borderRadius: Radius.cardInner,
+    borderCurve: 'continuous',
+    borderWidth: 1.5,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  chipText: { fontFamily: Font.nunito800, fontSize: 15 },
-  pressed: { transform: [{ scale: 0.97 }] },
-  footer: { paddingTop: 8, paddingHorizontal: 22, paddingBottom: 0 },
-  feedback: {
+  pressScale: { transform: [{ scale: 0.97 }] },
+
+  footer: { paddingHorizontal: Space.xl, paddingTop: Space.sm, gap: Space.md },
+  fb: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: 14,
-    marginBottom: 10,
+    borderRadius: Radius.control,
+    borderCurve: 'continuous',
   },
-  feedbackText: { fontFamily: Font.nunito800, fontSize: 14 },
 });

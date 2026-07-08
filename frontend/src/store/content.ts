@@ -1,11 +1,43 @@
 /**
- * Static content — transcribed 1:1 from the `Component` class in EarnLock.dc.html.
- * This is the mocked "AI" material for the MVP: fixed questions, recap, subjects, the app
- * blacklist, the Journey level map, and the Stats sample data. When the real AI/backend is
- * wired in later, only this module (and the store's fetch actions) change.
+ * Demo content — the self-contained "AI + backend" stand-in for the prototype. Everything the
+ * UI shows that isn't live loop state (unlock clock, streak, coins) comes from here: subjects,
+ * the app blacklist, the quiz material, the Learn course map, and the Insights series. When a
+ * real backend is wired in, only this module (and the store's fetch actions) change.
+ *
+ * Icons are SF Symbol names (rendered by <Sym/>). The palette stays near-monochrome, so subject
+ * wells are neutral; only real app marks keep their brand color, and lime is reserved for
+ * progress / earned / active states applied by the screens.
  */
-import type { IconName } from '@/components/Icon';
-import type { TokenName } from '@/theme/tokens';
+import type { SymName } from '@/components/Sym';
+
+/* ------------------------------------------------------------------ learner */
+
+export const LEARNER = {
+  name: 'Mia Chen',
+  initials: 'MC',
+  gradeLabel: 'Grade 8',
+  joined: 'Since March 2026',
+} as const;
+
+/* ---------------------------------------------------------------- subjects */
+
+export type SubjectKey =
+  'Math' | 'Biology' | 'History' | 'English' | 'Physics' | 'Chemistry' | 'Geography' | 'Coding';
+
+export type SubjectDef = { key: SubjectKey; icon: SymName };
+
+export const SUBJECT_DEFS: SubjectDef[] = [
+  { key: 'Math', icon: 'function' },
+  { key: 'Biology', icon: 'leaf.fill' },
+  { key: 'History', icon: 'building.columns.fill' },
+  { key: 'English', icon: 'character.book.closed.fill' },
+  { key: 'Physics', icon: 'atom' },
+  { key: 'Chemistry', icon: 'drop.fill' },
+  { key: 'Geography', icon: 'globe.americas.fill' },
+  { key: 'Coding', icon: 'chevron.left.forwardslash.chevron.right' },
+];
+
+/* -------------------------------------------------------------- quiz material */
 
 export type QuizOption = { e: string; t: string };
 export type Question = {
@@ -18,8 +50,8 @@ export type Question = {
 
 export const QUESTIONS: Question[] = [
   {
-    tag: 'BIOLOGY',
-    q: 'Which organelle is known as the “powerhouse” of the cell?',
+    tag: 'Biology',
+    q: 'Which organelle is the “powerhouse” of the cell?',
     opts: [
       { e: '📦', t: 'Golgi apparatus' },
       { e: '⚡', t: 'Mitochondrion' },
@@ -28,10 +60,10 @@ export const QUESTIONS: Question[] = [
     ],
     answer: 1,
     explain:
-      'Mitochondria turn nutrients and oxygen into ATP — the chemical “fuel” your cells run on. Because they make most of that energy, biologists nickname them the powerhouse of the cell.',
+      'Mitochondria turn nutrients and oxygen into ATP — the chemical fuel your cells run on. Because they make most of that energy, biologists nickname them the powerhouse of the cell.',
   },
   {
-    tag: 'HISTORY',
+    tag: 'History',
     q: 'In which year did the Berlin Wall fall?',
     opts: [
       { e: '📻', t: '1979' },
@@ -41,123 +73,107 @@ export const QUESTIONS: Question[] = [
     ],
     answer: 1,
     explain:
-      'On 9 November 1989, eased travel rules and huge peaceful protests brought crowds to the checkpoints and the Berlin Wall was opened. It paved the way for German reunification in 1990.',
+      'On 9 November 1989, eased travel rules and huge peaceful protests brought crowds to the checkpoints and the Berlin Wall was opened — paving the way for German reunification in 1990.',
+  },
+  {
+    tag: 'Physics',
+    q: 'What force pulls a dropped apple toward the ground?',
+    opts: [
+      { e: '🧲', t: 'Magnetism' },
+      { e: '🌍', t: 'Gravity' },
+      { e: '💨', t: 'Air pressure' },
+      { e: '⚡', t: 'Static charge' },
+    ],
+    answer: 1,
+    explain:
+      'Gravity is the attraction between masses. Earth’s enormous mass pulls the apple downward at about 9.8 m/s² — the same force that keeps the Moon in orbit.',
+  },
+  {
+    tag: 'Geography',
+    q: 'Which is the longest river in the world?',
+    opts: [
+      { e: '🌊', t: 'Amazon' },
+      { e: '🏜️', t: 'Nile' },
+      { e: '🐉', t: 'Yangtze' },
+      { e: '🦅', t: 'Mississippi' },
+    ],
+    answer: 1,
+    explain:
+      'The Nile runs about 6,650 km through north-east Africa. (The Amazon is a very close second and carries far more water — but the Nile edges it on length.)',
   },
 ];
 
-/** Number of multiple-choice questions before the Recap step. */
+/** Multiple-choice questions before the fill-in-the-blank recap. */
 export const MC_COUNT = QUESTIONS.length;
 
 export const RECAP = {
-  tag: 'RECAP',
+  tag: 'Recap',
   pre: 'A triangle’s interior angles always add up to',
   post: 'degrees.',
   options: ['90', '180', '360'],
   answer: '180',
 } as const;
 
-export type SubjectKey =
-  | 'Math'
-  | 'History'
-  | 'Biology'
-  | 'English'
-  | 'Physics'
-  | 'Chemistry'
-  | 'Geography'
-  | 'Coding';
+export const PASTE_EXAMPLE =
+  'Photosynthesis: plants use sunlight, water and CO₂ to make glucose and release oxygen. It happens mostly in the chloroplasts, where the green pigment chlorophyll absorbs light energy.';
 
-export type SubjectDef = { key: SubjectKey; icon: IconName; soft: TokenName; color: TokenName };
+/* ---------------------------------------------------------------- Learn tab */
 
-export const SUBJECT_DEFS: SubjectDef[] = [
-  { key: 'Math', icon: 'calc', soft: 'primarySoft', color: 'primary' },
-  { key: 'History', icon: 'globe', soft: 'pinkSoft', color: 'pink' },
-  { key: 'Biology', icon: 'leaf', soft: 'successSoft', color: 'success' },
-  { key: 'English', icon: 'chat', soft: 'blueSoft', color: 'blue' },
-  { key: 'Physics', icon: 'atom', soft: 'primarySoft', color: 'primary' },
-  { key: 'Chemistry', icon: 'flask', soft: 'pinkSoft', color: 'pink' },
-  { key: 'Geography', icon: 'pin', soft: 'successSoft', color: 'success' },
-  { key: 'Coding', icon: 'code', soft: 'blueSoft', color: 'blue' },
+export type LessonState = 'done' | 'active' | 'locked';
+export type Lesson = { title: string; state: LessonState; minutes: number };
+
+export const COURSE = {
+  subject: 'Biology',
+  title: 'The Living Cell',
+  progress: 0.55, // 0..1
+  lessons: [
+    { title: 'What cells are', state: 'done', minutes: 4 },
+    { title: 'Inside the cell', state: 'done', minutes: 5 },
+    { title: 'Energy & mitochondria', state: 'active', minutes: 6 },
+    { title: 'Photosynthesis', state: 'locked', minutes: 5 },
+    { title: 'Genes & DNA', state: 'locked', minutes: 7 },
+  ] as Lesson[],
+} as const;
+
+/** Last 7 days of the learning streak (today is last). */
+export const STREAK_DAYS: { d: string; done: boolean; today?: boolean }[] = [
+  { d: 'M', done: true },
+  { d: 'T', done: true },
+  { d: 'W', done: true },
+  { d: 'T', done: true },
+  { d: 'F', done: false },
+  { d: 'S', done: true },
+  { d: 'S', done: false, today: true },
 ];
 
-export type AppKey = 'tiktok' | 'insta' | 'brawl' | 'youtube';
-export type AppDef = { key: AppKey; name: string; cat: string; tile: string; icon: IconName };
+/* ------------------------------------------------------------- Insights tab */
 
-export const APP_DEFS: AppDef[] = [
-  { key: 'tiktok', name: 'TikTok', cat: 'Short video', tile: '#111114', icon: 'music' },
-  { key: 'insta', name: 'Instagram', cat: 'Social', tile: '#d6336c', icon: 'camera' },
-  { key: 'brawl', name: 'Brawl Stars', cat: 'Games', tile: '#f59f00', icon: 'game' },
-  { key: 'youtube', name: 'YouTube', cat: 'Video', tile: '#e5342a', icon: 'play' },
-];
-
-export type EduItem = { name: string; cat: string; tile: string };
-
-export const EDU_ITEMS: EduItem[] = [
-  { name: 'Class Notes', cat: 'Study', tile: '#3b82f6' },
-  { name: 'Dictionary', cat: 'Reference', tile: '#12a866' },
-  { name: 'Calculator', cat: 'Tools', tile: '#ff1493' },
-];
-
-/** Journey level map: node states, accent colors, labels, and their layout points. */
-export type LevelState = 'done' | 'active' | 'locked';
-export type Level = { state: LevelState; col: TokenName; label: string };
-
-export const JOURNEY_LEVELS: Level[] = [
-  { state: 'done', col: 'teal', label: 'Cell basics' },
-  { state: 'done', col: 'blue', label: 'Organelles' },
-  { state: 'active', col: 'primary', label: 'Energy' },
-  { state: 'locked', col: 'teal', label: 'Photosynthesis' },
-  { state: 'locked', col: 'blue', label: 'Genetics' },
-];
-
-export const JOURNEY_VIEWBOX = { w: 300, h: 560 };
-export const JOURNEY_POINTS = [
-  { x: 214, y: 52 },
-  { x: 92, y: 154 },
-  { x: 206, y: 256 },
-  { x: 96, y: 358 },
-  { x: 210, y: 460 },
-];
-
-/** Vertical S-curve through the points (matches the prototype's `smoothPath`). */
-export function smoothPath(points: { x: number; y: number }[]): string {
-  if (points.length === 0) return '';
-  let d = `M${points[0].x} ${points[0].y}`;
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1];
-    const b = points[i];
-    const my = (a.y + b.y) / 2;
-    d += ` C ${a.x} ${my} ${b.x} ${my} ${b.x} ${b.y}`;
-  }
-  return d;
-}
-
-/** Stats — weekly focus bars (0..1 relative height, `today` is highlighted). */
-export const WEEK_BARS = [
-  { d: 'M', v: 0.6 },
-  { d: 'T', v: 0.9 },
-  { d: 'W', v: 0.4 },
-  { d: 'T', v: 1 },
-  { d: 'F', v: 0.75 },
-  { d: 'S', v: 0.3 },
-  { d: 'S', v: 0.55 },
+/** Minutes learned per weekday (drives the bar chart; today highlighted). */
+export const WEEK_MINUTES: { d: string; min: number }[] = [
+  { d: 'M', min: 32 },
+  { d: 'T', min: 48 },
+  { d: 'W', min: 20 },
+  { d: 'T', min: 55 },
+  { d: 'F', min: 40 },
+  { d: 'S', min: 15 },
+  { d: 'S', min: 28 },
 ];
 export const WEEK_TODAY_INDEX = 3;
 
-export type SubjectStat = { name: string; pct: number; col: TokenName };
-export const SUBJECT_STATS: SubjectStat[] = [
-  { name: 'Biology', pct: 72, col: 'teal' },
-  { name: 'History', pct: 54, col: 'orange' },
-  { name: 'Math', pct: 88, col: 'primary' },
-  { name: 'English', pct: 35, col: 'blue' },
+export type SubjectMastery = { name: string; pct: number };
+export const SUBJECT_MASTERY: SubjectMastery[] = [
+  { name: 'Math', pct: 88 },
+  { name: 'Biology', pct: 72 },
+  { name: 'History', pct: 54 },
+  { name: 'English', pct: 41 },
 ];
 
-/** Profile focus-subject chips (name + accent token). */
-export const PROFILE_SUBJECTS: { name: string; col: TokenName; soft: TokenName }[] = [
-  { name: 'Math', col: 'primary', soft: 'primarySoft' },
-  { name: 'History', col: 'orange', soft: 'orangeSoft' },
-  { name: 'Biology', col: 'teal', soft: 'tealSoft' },
-  { name: 'English', col: 'blue', soft: 'blueSoft' },
-];
+/** Screen time earned vs. actually spent this week (minutes). */
+export const TIME_LEDGER = { earned: 315, spent: 268 };
 
-export const PASTE_EXAMPLE =
-  'Photosynthesis: plants use sunlight, water and CO₂ to make glucose and release oxygen. It happens mostly in the chloroplasts, where the green pigment chlorophyll absorbs light energy.';
+export const INSIGHT_TOTALS: { label: string; value: string; icon: SymName }[] = [
+  { label: 'Questions solved', value: '312', icon: 'checkmark.seal.fill' },
+  { label: 'Accuracy', value: '86%', icon: 'target' },
+  { label: 'Best streak', value: '11', icon: 'flame.fill' },
+  { label: 'Time earned', value: '42h', icon: 'hourglass' },
+];

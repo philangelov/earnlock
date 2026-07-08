@@ -1,39 +1,40 @@
 /**
  * EarnLock store — the app's state + the mocked loop logic, lifted from the `Component`
  * class in EarnLock.dc.html. Navigation is handled by expo-router in the screens; this store
- * owns the data and the pure state transitions. Durable progress (grade, subjects, blacklist,
- * coins, streak, balance, SOS/debt) is persisted to AsyncStorage; transient quiz state is not.
+ * owns the data and the pure state transitions. Durable progress (onboarding, grade, subjects,
+ * blacklist, coins, streak, unlock deadline, SOS/debt) is persisted to AsyncStorage; transient
+ * quiz state is not.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { PASTE_EXAMPLE, type AppKey, type SubjectKey } from './content';
+import { PASTE_EXAMPLE, type SubjectKey } from './content';
 
-export type RouteVariant = 'A' | 'B';
+/** Screen time granted per completed quiz / per SOS, in milliseconds. */
+export const REWARD_MS = 15 * 60_000;
+export const SOS_MS = 2 * 60_000;
 
 export type EarnLockState = {
+  onboarded: boolean;
   grade: number;
   subj: Record<SubjectKey, boolean>;
   importText: string;
   imported: boolean;
   uploadName: string;
-  apps: Record<AppKey, boolean>;
-  routeVar: RouteVariant;
-  quizVar: RouteVariant;
   qIndex: number;
   selected: number | null;
   checked: boolean;
   recapPick: string | null;
   recapChecked: boolean;
-  minutesLeft: number;
+  /** Epoch ms until which apps are unlocked; 0 (or past) = locked. */
+  unlockUntil: number;
   streak: number;
   coins: number;
   sosUsed: boolean;
   debt: boolean;
 
   // onboarding
-  setGrade: (grade: number) => void;
   gradeUp: () => void;
   gradeDown: () => void;
   toggleSubj: (key: SubjectKey) => void;
@@ -41,26 +42,28 @@ export type EarnLockState = {
   pasteExample: () => void;
   setUploadName: (name: string) => void;
   doImport: () => void;
-  toggleApp: (key: AppKey) => void;
-
-  // prototype variants
-  setRouteVar: (v: RouteVariant) => void;
-  setQuizVar: (v: RouteVariant) => void;
+  completeOnboarding: () => void;
 
   // quiz flow
   pick: (index: number) => void;
   check: () => void;
   nextQuestion: () => void;
+  retryQuestion: () => void;
   resetQuizFlow: () => void;
   pickRecap: (word: string) => void;
   checkRecap: () => void;
+  retryRecap: () => void;
 
   // rewards / hooks
   claim: () => void;
-  useSos: () => void;
+  activateSos: () => void;
+
+  // demo utilities
+  resetAll: () => void;
 };
 
 const initial = {
+  onboarded: false,
   grade: 8,
   subj: {
     Math: true,
@@ -75,15 +78,12 @@ const initial = {
   importText: '',
   imported: false,
   uploadName: '',
-  apps: { tiktok: true, insta: true, brawl: true, youtube: false } as Record<AppKey, boolean>,
-  routeVar: 'A' as RouteVariant,
-  quizVar: 'A' as RouteVariant,
   qIndex: 0,
   selected: null as number | null,
   checked: false,
   recapPick: null as string | null,
   recapChecked: false,
-  minutesLeft: 0,
+  unlockUntil: 0,
   streak: 4,
   coins: 220,
   sosUsed: false,
@@ -95,53 +95,71 @@ export const useEarnLock = create<EarnLockState>()(
     (set) => ({
       ...initial,
 
-      setGrade: (grade) => set({ grade }),
       gradeUp: () => set((s) => ({ grade: Math.min(12, s.grade + 1) })),
       gradeDown: () => set((s) => ({ grade: Math.max(1, s.grade - 1) })),
       toggleSubj: (key) => set((s) => ({ subj: { ...s.subj, [key]: !s.subj[key] } })),
-      setImportText: (importText) => set({ importText }),
-      pasteExample: () => set({ importText: PASTE_EXAMPLE }),
-      setUploadName: (uploadName) => set({ uploadName }),
+      // Editing the inputs invalidates a previous "questions ready" result.
+      setImportText: (importText) => set({ importText, imported: false }),
+      pasteExample: () => set({ importText: PASTE_EXAMPLE, imported: false }),
+      setUploadName: (uploadName) => set({ uploadName, imported: false }),
       doImport: () => set({ imported: true }),
-      toggleApp: (key) => set((s) => ({ apps: { ...s.apps, [key]: !s.apps[key] } })),
-
-      setRouteVar: (routeVar) => set({ routeVar }),
-      setQuizVar: (quizVar) => set({ quizVar }),
+      completeOnboarding: () => set({ onboarded: true }),
 
       pick: (index) => set((s) => (s.checked ? {} : { selected: index })),
       check: () => set((s) => (s.selected != null ? { checked: true } : {})),
       nextQuestion: () => set((s) => ({ qIndex: s.qIndex + 1, selected: null, checked: false })),
+      // Clear the current attempt but keep the question index (used after remediation).
+      retryQuestion: () => set({ selected: null, checked: false }),
       resetQuizFlow: () =>
-        set({ qIndex: 0, selected: null, checked: false, recapPick: null, recapChecked: false }),
+        set({
+          qIndex: 0,
+          selected: null,
+          checked: false,
+          recapPick: null,
+          recapChecked: false,
+        }),
       pickRecap: (word) => set((s) => (s.recapChecked ? {} : { recapPick: word })),
       checkRecap: () => set((s) => (s.recapPick ? { recapChecked: true } : {})),
+      // Clear a wrong recap attempt so the learner must get it right before the reward.
+      retryRecap: () => set({ recapPick: null, recapChecked: false }),
 
       claim: () =>
         set((s) => ({
-          minutesLeft: 15,
+          // Extend the unlock window; stacking on top of any time still remaining.
+          unlockUntil: Math.max(Date.now(), s.unlockUntil) + REWARD_MS,
           coins: s.coins + 20,
+          // Completing a quiz repays the SOS debt and refreshes the SOS allowance.
+          debt: false,
+          sosUsed: false,
           qIndex: 0,
           selected: null,
           checked: false,
           recapPick: null,
           recapChecked: false,
         })),
-      useSos: () => set({ sosUsed: true, debt: true, minutesLeft: 2 }),
+      activateSos: () =>
+        set((s) => ({
+          sosUsed: true,
+          debt: true,
+          // Stack on top of any time already earned rather than truncating it.
+          unlockUntil: Math.max(Date.now(), s.unlockUntil) + SOS_MS,
+        })),
+
+      // Wipe progress back to a fresh first-run state (demo reset).
+      resetAll: () => set({ ...initial }),
     }),
     {
       name: 'earnlock-store',
       storage: createJSONStorage(() => AsyncStorage),
       // Persist durable progress only; quiz-flow state stays transient.
       partialize: (s) => ({
+        onboarded: s.onboarded,
         grade: s.grade,
         subj: s.subj,
         importText: s.importText,
         imported: s.imported,
         uploadName: s.uploadName,
-        apps: s.apps,
-        routeVar: s.routeVar,
-        quizVar: s.quizVar,
-        minutesLeft: s.minutesLeft,
+        unlockUntil: s.unlockUntil,
         streak: s.streak,
         coins: s.coins,
         sosUsed: s.sosUsed,
