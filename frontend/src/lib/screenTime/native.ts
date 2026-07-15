@@ -67,14 +67,36 @@ function writeShieldConfig(): void {
         secondaryButtonLabelColor: rgb('#9c9ea6'),
       },
       {
-        // Primary opens EarnLock's lock screen so the learner can earn time. Launching the
-        // containing app from a shield-action extension is the delicate part: a synchronous
-        // NSExtensionContext().open() runs before the extension is ready to hand off and
-        // silently no-ops, which is why "Start a quiz" did nothing. `openUrlWithDispatch`
-        // defers the open to the next main-run-loop tick, and `delay` holds the shield (and
-        // thus the extension process) alive ~0.6s so that dispatched open actually fires
-        // before the shield tears down. This is what makes the button reliably open the app.
-        primary: { type: 'openUrlWithDispatch', url, behavior: 'close', delay: 0.6 },
+        // Getting from the shield into the app is the hard part. Apple gives a
+        // ShieldAction extension no supported way to launch its host app: RNDA's
+        // `openUrl`/`openUrlWithDispatch` build a fresh NSExtensionContext and call
+        // `open()`, which has no host to hand off to and silently no-ops on many
+        // iOS builds — which is why "Start a quiz" did nothing.
+        //
+        // The reliable path is a local notification: tapping ANY notification launches
+        // the app, and RNDA copies our `userInfo` onto it, so `userInfo.url` routes
+        // straight to the lock screen (see observeNotificationTaps in lib/notifications).
+        // We fire that notification AND still attempt the direct open, so on builds
+        // where `open()` happens to work it's a single tap, and everywhere else the
+        // notification is a dependable fallback.
+        primary: {
+          type: 'openUrlWithDispatch',
+          url,
+          behavior: 'close',
+          delay: 0.6,
+          actions: [
+            {
+              type: 'sendNotification',
+              payload: {
+                title: 'Earn your screen time',
+                body: 'Tap to answer a few quick questions and unlock your apps.',
+                sound: 'default',
+                interruptionLevel: 'active',
+                userInfo: { url: '/locked' },
+              },
+            },
+          ],
+        },
         // "Not now" just returns to the Home screen — the apps stay locked.
         secondary: { behavior: 'close' },
       },
